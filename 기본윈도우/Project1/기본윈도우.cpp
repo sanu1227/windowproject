@@ -45,9 +45,10 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 	//--- 메시지 처리하기
 	switch (uMsg) {
 	case WM_CREATE:
-		GetClientRect (hWnd, &rt);
+
 		break;
 	case WM_PAINT:
+		GetClientRect(hWnd, &rt);
 		hDC = BeginPaint(hWnd, &ps);
 		mDC = CreateCompatibleDC (hDC); //--- 메모리 DC 만들기
 		hBitmap = CreateCompatibleBitmap (hDC, rt.right, rt.bottom); //--- 메모리 DC와 연결할 비트맵 만들기
