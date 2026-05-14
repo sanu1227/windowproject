@@ -51,9 +51,14 @@ int block = 2;            // 장애물 개수
 int startx = 100;         // 보드 시작 x 좌표
 int starty = 100;         // 보드 시작 y 좌표
 bool isStart = false;     // 게임 시작 여부
+int winNumber = 64;       // 기본 승리 조건은 64
 
 int cells[boardsize * boardsize];       // 보드 칸 번호를 섞기 위한 배열
 int board[boardsize][boardsize];        // 실제 보드 상태 저장 배열
+
+// 이번 드래그에서 합쳐져 새로 만들어진 숫자 위치 저장
+// true인 칸의 숫자는 그 턴에는 이동하지 않음
+bool mergedCell[boardsize][boardsize];
 
 /*
 board 값의 의미
@@ -89,9 +94,17 @@ void makeRandomCells();
 void drawNumbers(HDC hDC);
 void checkDragDirection();
 
+void clearMergedCells();
+
 bool mergeNumbers(int dir);
 bool moveNumbersOneStep(int dir);
 bool createNewNum2();
+
+bool checkWin();
+bool canDoAnyAction();
+
+void winGame(HWND hWnd);
+void loseGame(HWND hWnd);
 
 
 // ------------------------------------------------------------
@@ -104,6 +117,9 @@ void initBoard() {
 			board[y][x] = 0;
 		}
 	}
+
+	// 합쳐진 칸 기록도 초기화
+	clearMergedCells();
 
 	// 전체 칸 번호를 랜덤하게 섞음
 	makeRandomCells();
@@ -271,22 +287,33 @@ void checkDragDirection() {
 
 
 // ------------------------------------------------------------
+// 이번 드래그에서 합쳐진 위치 기록 초기화
+// ------------------------------------------------------------
+void clearMergedCells() {
+	for (int y = 0; y < boardsize; y++) {
+		for (int x = 0; x < boardsize; x++) {
+			mergedCell[y][x] = false;
+		}
+	}
+}
+
+
+// ------------------------------------------------------------
 // 같은 숫자끼리 먼저 합치기
 // 합쳐진 경우 true 반환
+// 합쳐져 새로 만들어진 숫자 위치는 mergedCell에 기록
 // ------------------------------------------------------------
 bool mergeNumbers(int dir) {
 	bool isMerged = false;
 
 	// --------------------------------------------------------
 	// 오른쪽 방향 합치기
-	// 오른쪽부터 왼쪽으로 검사해야 같은 드래그 안에서 중복 합치기 방지 가능
+	// 오른쪽부터 왼쪽으로 검사
 	// --------------------------------------------------------
 	if (dir == DIR_RIGHT) {
 		for (int y = 0; y < boardsize; ++y) {
 			for (int x = boardsize - 2; x >= 0; --x) {
 
-				// 현재 칸과 오른쪽 칸이 같은 숫자이며,
-				// 현재 숫자가 최대값보다 작을 때만 합침
 				if (
 					board[y][x] > 0 &&
 					board[y][x] == board[y][x + 1] &&
@@ -294,6 +321,10 @@ bool mergeNumbers(int dir) {
 					) {
 					board[y][x + 1] *= 2;
 					board[y][x] = 0;
+
+					// 합쳐져서 새로 생긴 위치 기록
+					mergedCell[y][x + 1] = true;
+
 					isMerged = true;
 				}
 			}
@@ -315,6 +346,10 @@ bool mergeNumbers(int dir) {
 					) {
 					board[y][x - 1] *= 2;
 					board[y][x] = 0;
+
+					// 합쳐져서 새로 생긴 위치 기록
+					mergedCell[y][x - 1] = true;
+
 					isMerged = true;
 				}
 			}
@@ -336,6 +371,10 @@ bool mergeNumbers(int dir) {
 					) {
 					board[y - 1][x] *= 2;
 					board[y][x] = 0;
+
+					// 합쳐져서 새로 생긴 위치 기록
+					mergedCell[y - 1][x] = true;
+
 					isMerged = true;
 				}
 			}
@@ -357,6 +396,10 @@ bool mergeNumbers(int dir) {
 					) {
 					board[y + 1][x] *= 2;
 					board[y][x] = 0;
+
+					// 합쳐져서 새로 생긴 위치 기록
+					mergedCell[y + 1][x] = true;
+
 					isMerged = true;
 				}
 			}
@@ -368,7 +411,8 @@ bool mergeNumbers(int dir) {
 
 
 // ------------------------------------------------------------
-// 합칠 것이 없을 때만 한 칸 이동
+// 숫자 블록을 한 칸 이동
+// 단, 이번 드래그에서 합쳐져 새로 만들어진 숫자는 이동하지 않음
 // 이동이 발생하면 true 반환
 // ------------------------------------------------------------
 bool moveNumbersOneStep(int dir) {
@@ -379,7 +423,11 @@ bool moveNumbersOneStep(int dir) {
 		for (int y = 0; y < boardsize; ++y) {
 			for (int x = boardsize - 2; x >= 0; --x) {
 
-				if (board[y][x] > 0 && board[y][x + 1] == 0) {
+				if (
+					board[y][x] > 0 &&
+					mergedCell[y][x] == false &&
+					board[y][x + 1] == 0
+					) {
 					board[y][x + 1] = board[y][x];
 					board[y][x] = 0;
 					isMoved = true;
@@ -393,7 +441,11 @@ bool moveNumbersOneStep(int dir) {
 		for (int y = 0; y < boardsize; ++y) {
 			for (int x = 1; x < boardsize; ++x) {
 
-				if (board[y][x] > 0 && board[y][x - 1] == 0) {
+				if (
+					board[y][x] > 0 &&
+					mergedCell[y][x] == false &&
+					board[y][x - 1] == 0
+					) {
 					board[y][x - 1] = board[y][x];
 					board[y][x] = 0;
 					isMoved = true;
@@ -407,7 +459,11 @@ bool moveNumbersOneStep(int dir) {
 		for (int x = 0; x < boardsize; ++x) {
 			for (int y = 1; y < boardsize; ++y) {
 
-				if (board[y][x] > 0 && board[y - 1][x] == 0) {
+				if (
+					board[y][x] > 0 &&
+					mergedCell[y][x] == false &&
+					board[y - 1][x] == 0
+					) {
 					board[y - 1][x] = board[y][x];
 					board[y][x] = 0;
 					isMoved = true;
@@ -421,7 +477,11 @@ bool moveNumbersOneStep(int dir) {
 		for (int x = 0; x < boardsize; ++x) {
 			for (int y = boardsize - 2; y >= 0; --y) {
 
-				if (board[y][x] > 0 && board[y + 1][x] == 0) {
+				if (
+					board[y][x] > 0 &&
+					mergedCell[y][x] == false &&
+					board[y + 1][x] == 0
+					) {
 					board[y + 1][x] = board[y][x];
 					board[y][x] = 0;
 					isMoved = true;
@@ -481,6 +541,103 @@ bool createNewNum2() {
 	board[y][x] = 2;
 
 	return true;
+}
+
+
+// ------------------------------------------------------------
+// 승리 조건 확인
+// 선택한 목표 숫자 이상이 만들어졌는지 검사
+// ------------------------------------------------------------
+bool checkWin() {
+	for (int y = 0; y < boardsize; y++) {
+		for (int x = 0; x < boardsize; x++) {
+			if (board[y][x] >= winNumber) {
+				return true;
+			}
+		}
+	}
+
+	return false;
+}
+
+
+// ------------------------------------------------------------
+// 더 이상 이동하거나 합칠 수 있는지 확인
+// 아무 행동도 할 수 없으면 false 반환
+// ------------------------------------------------------------
+bool canDoAnyAction() {
+	for (int y = 0; y < boardsize; y++) {
+		for (int x = 0; x < boardsize; x++) {
+
+			// 숫자 블록만 검사
+			if (board[y][x] > 0) {
+
+				// 왼쪽 검사
+				if (x - 1 >= 0) {
+					if (board[y][x - 1] == 0)
+						return true;
+
+					if (board[y][x - 1] == board[y][x] && board[y][x] < max_num_value)
+						return true;
+				}
+
+				// 오른쪽 검사
+				if (x + 1 < boardsize) {
+					if (board[y][x + 1] == 0)
+						return true;
+
+					if (board[y][x + 1] == board[y][x] && board[y][x] < max_num_value)
+						return true;
+				}
+
+				// 위쪽 검사
+				if (y - 1 >= 0) {
+					if (board[y - 1][x] == 0)
+						return true;
+
+					if (board[y - 1][x] == board[y][x] && board[y][x] < max_num_value)
+						return true;
+				}
+
+				// 아래쪽 검사
+				if (y + 1 < boardsize) {
+					if (board[y + 1][x] == 0)
+						return true;
+
+					if (board[y + 1][x] == board[y][x] && board[y][x] < max_num_value)
+						return true;
+				}
+			}
+		}
+	}
+
+	return false;
+}
+
+
+// ------------------------------------------------------------
+// 승리 처리
+// ------------------------------------------------------------
+void winGame(HWND hWnd) {
+	WCHAR message[100];
+
+	wsprintf(message, L"%d를 만들었습니다!\n게임 승리!", winNumber);
+
+	MessageBox(hWnd, message, L"승리", MB_OK | MB_ICONINFORMATION);
+
+	isStart = false;
+	InvalidateRect(hWnd, NULL, TRUE);
+}
+
+
+// ------------------------------------------------------------
+// 패배 처리
+// ------------------------------------------------------------
+void loseGame(HWND hWnd) {
+	MessageBox(hWnd, L"더 이상 진행할 수 없습니다.\n게임 패배!", L"패배", MB_OK | MB_ICONWARNING);
+
+	isStart = false;
+	InvalidateRect(hWnd, NULL, TRUE);
 }
 
 
@@ -614,43 +771,64 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 
 
 	case WM_LBUTTONUP:
-		// 게임 시작 상태에서만 드래그 동작 처리
 		if (isStart) {
 			dragEndX = LOWORD(lParam);
 			dragEndY = HIWORD(lParam);
 
-			// 드래그 방향 계산
 			checkDragDirection();
 
 			if (slideDir != DIR_NONE) {
 				bool isChanged = false;
 
-				// 1. 먼저 합치기 시도
+				// 이번 드래그에서 합쳐진 위치 기록 초기화
+				clearMergedCells();
+
+				// 1. 같은 숫자는 먼저 합침
 				bool isMerged = mergeNumbers(slideDir);
 
-				// 2. 합치기가 있었다면 이동은 하지 않음
-				if (isMerged) {
+				// 2. 합쳐진 숫자는 그대로 두고,
+				//    합쳐지지 않은 나머지 숫자는 한 칸 이동
+				bool isMoved = moveNumbersOneStep(slideDir);
+
+				// 합치기 또는 이동이 있었다면 변화가 발생한 것
+				if (isMerged || isMoved) {
 					isChanged = true;
 				}
-				// 3. 합치기가 없을 때만 한 칸 이동
-				else {
-					bool isMoved = moveNumbersOneStep(slideDir);
 
-					if (isMoved) {
-						isChanged = true;
+				// 3. 보드에 변화가 있었다면 처리
+				if (isChanged) {
+
+					// 목표 숫자가 만들어졌으면 즉시 승리
+					if (checkWin()) {
+						InvalidateRect(hWnd, NULL, TRUE);
+						winGame(hWnd);
+						slideDir = DIR_NONE;
+						break;
+					}
+
+					// 새 숫자 2 생성 시도
+					bool isCreated = createNewNum2();
+
+					// 새 2를 만들 수 없으면 패배
+					if (!isCreated) {
+						InvalidateRect(hWnd, NULL, TRUE);
+						loseGame(hWnd);
+						slideDir = DIR_NONE;
+						break;
 					}
 				}
 
-				// 4. 합치기 또는 이동이 실제로 발생했다면 새 숫자 2 생성
-				if (isChanged) {
-					createNewNum2();
+				// 4. 현재 상태에서 아무 행동도 할 수 없으면 패배
+				if (!canDoAnyAction()) {
+					InvalidateRect(hWnd, NULL, TRUE);
+					loseGame(hWnd);
+					slideDir = DIR_NONE;
+					break;
 				}
 
-				// 화면 다시 그리기
 				InvalidateRect(hWnd, NULL, TRUE);
 			}
 
-			// 방향 초기화
 			slideDir = DIR_NONE;
 		}
 		break;
@@ -658,6 +836,14 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 
 	case WM_COMMAND:
 		switch (LOWORD(wParam)) {
+
+		case ID_GOAL_32:
+			winNumber = 32;
+			break;
+
+		case ID_GOAL_64:
+			winNumber = 64;
+			break;
 
 		case ID_GAME_START:
 			isStart = true;
