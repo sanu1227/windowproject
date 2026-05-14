@@ -79,19 +79,20 @@ void drawblock(HDC hDC) {
 	HBRUSH hBrush = CreateSolidBrush(RGB(255, 0, 0)); // 빨간색 블록
 	HBRUSH oldBrush = (HBRUSH)SelectObject(hDC, hBrush);
 	
-	for (int i = 0; i < block; i++) {
-		int cellNumber = cells[i];
+	for (int y = 0; y < boardsize; y++) {
+		for (int x = 0; x < boardsize; x++) {
 
-		int randx = cellNumber % boardsize;
-		int randy = cellNumber / boardsize;
-
-		Rectangle(
-			hDC,
-			startx + randx * cellsize,
-			starty + randy * cellsize,
-			startx + (randx + 1) * cellsize,
-			starty + (randy + 1) * cellsize
-		);
+			// board 값이 -1이면 장애물
+			if (board[y][x] == -1) {
+				Rectangle(
+					hDC,
+					startx + x * cellsize,
+					starty + y * cellsize,
+					startx + (x + 1) * cellsize,
+					starty + (y + 1) * cellsize
+				);
+			}
+		}
 	}
 
 	SelectObject(hDC, oldBrush);
@@ -116,19 +117,20 @@ void makeRandomBlocks() {
 
 void drawNum2(HDC hDC) {
 
-	for (int i = block; i < block + b_num2; ++i) {
-		int cellNumber = cells[i];          // 선택된 칸 번호
+	for (int y = 0; y < boardsize; y++) {
+		for (int x = 0; x < boardsize; x++) {
 
-		int cellx = cellNumber % boardsize; // 몇 번째 열인지
-		int celly = cellNumber / boardsize; // 몇 번째 행인지
+			// board 값이 2이면 숫자 2 이미지 그림
+			if (board[y][x] == 2) {
+				int left = startx + x * cellsize;
+				int top = starty + y * cellsize;
+				int right = left + cellsize;
+				int bottom = top + cellsize;
 
-		int left = startx + cellx * cellsize;       // 셀의 좌상단 x
-		int top = starty + celly * cellsize;       // 셀의 좌상단 y
-		int right = left + cellsize;                 // 셀의 우하단 x
-		int bottom = top + cellsize;                  // 셀의 우하단 y
-
-		RECT Rectnum2 = { left, top, right, bottom };
-		num2.Draw(hDC, Rectnum2);
+				RECT Rectnum2 = { left, top, right, bottom };
+				num2.Draw(hDC, Rectnum2);
+			}
+		}
 	}
 }
 
@@ -215,17 +217,17 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			break;
 		case ID_BLOCK_2:
 			block = 2;
-			makeRandomBlocks();
+			intboard();
 			InvalidateRect(hWnd, NULL, TRUE);
 			break;
 		case ID_BLOCK_3:
 			block = 3;
-			makeRandomBlocks();
+			intboard();
 			InvalidateRect(hWnd, NULL, TRUE);
 			break;
 		case ID_BLOCK_4:
 			block = 4;
-			makeRandomBlocks();
+			intboard();
 			InvalidateRect(hWnd, NULL, TRUE);
 			break;
 		}
