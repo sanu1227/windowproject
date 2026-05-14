@@ -39,6 +39,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 	PAINTSTRUCT ps;
 	HDC hDC, mDC;
 	RECT rt;
+	HBITMAP hBitmap;
+
 	
 	//--- 메시지 처리하기
 	switch (uMsg) {
