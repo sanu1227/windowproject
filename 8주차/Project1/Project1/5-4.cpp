@@ -2,6 +2,7 @@
 #include <tchar.h>
 #include <time.h>
 #include <atlimage.h>
+#include "resource.h"
 
 HINSTANCE g_hInst;
 LPCTSTR lpszClass = L"My Window Class";
@@ -10,12 +11,12 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam)
 
 #define cellsize 100
 #define boardsize 6
-#define block 2
 #define b_num2 2
 
+int block = 2;
 int startx = 100;
 int starty = 100;
-
+bool isStart = false;
 int cells[boardsize * boardsize];
 
 
@@ -78,7 +79,6 @@ void makeRandomBlocks() {
 }
 
 void drawNum2(HDC hDC) {
-	num2.Load(L"5-4/2.png");
 
 	for (int i = block; i < block + b_num2; ++i) {
 		int cellNumber = cells[i];          // 선택된 칸 번호
@@ -111,7 +111,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpszCmdPa
 	WndClass.hIcon = LoadIcon(NULL, IDI_APPLICATION);
 	WndClass.hCursor = LoadCursor(NULL, IDC_ARROW);
 	WndClass.hbrBackground = (HBRUSH)GetStockObject(WHITE_BRUSH);
-	WndClass.lpszMenuName = NULL;
+	WndClass.lpszMenuName = MAKEINTRESOURCE(IDR_MENU1);
 	WndClass.lpszClassName = lpszClass;
 	WndClass.hIconSm = LoadIcon(NULL, IDI_APPLICATION);
 	RegisterClassEx(&WndClass);
@@ -136,6 +136,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 	//--- 메시지 처리하기
 	switch (uMsg) {
 	case WM_CREATE:
+		num2.Load(L"5-4/2.png");
 		srand((unsigned int)time(NULL));
 		makeRandomBlocks();
 		break;
@@ -148,9 +149,10 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		FillRect(mDC, &rt, (HBRUSH)GetStockObject(WHITE_BRUSH));
 
 		drawboard(mDC);
-		drawblock(mDC);
-		drawNum2(mDC);
-
+		if (isStart) {
+			drawblock(mDC);
+			drawNum2(mDC);
+		}
 		BitBlt(hDC, 0, 0, rt.right, rt.bottom, mDC, 0, 0, SRCCOPY);
 
 		DeleteDC(mDC); //--- 생성한 메모리 DC 삭제
@@ -160,7 +162,33 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 	case WM_TIMER:
 		InvalidateRect(hWnd, NULL, false);
 		break;
-
+	case WM_COMMAND:
+		switch (LOWORD(wParam)) {
+		case ID_GAME_START:
+			isStart = true;
+			InvalidateRect(hWnd, NULL, TRUE);
+			break;
+		case ID_GAME_END:
+			isStart = false;
+			InvalidateRect(hWnd, NULL, TRUE);
+			break;
+		case ID_BLOCK_2:
+			block = 2;
+			makeRandomBlocks();
+			InvalidateRect(hWnd, NULL, TRUE);
+			break;
+		case ID_BLOCK_3:
+			block = 3;
+			makeRandomBlocks();
+			InvalidateRect(hWnd, NULL, TRUE);
+			break;
+		case ID_BLOCK_4:
+			block = 4;
+			makeRandomBlocks();
+			InvalidateRect(hWnd, NULL, TRUE);
+			break;
+		}
+		break;
 	case WM_DESTROY:
 		PostQuitMessage(0);
 		break;
