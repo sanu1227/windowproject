@@ -2,6 +2,7 @@
 #include <tchar.h>
 #include <time.h>
 #include <atlimage.h>
+#include <stdlib.h>
 #include "resource.h"
 
 HINSTANCE g_hInst;
@@ -13,6 +14,18 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam)
 #define boardsize 6
 #define b_num2 2
 
+#define DIR_NONE  0
+#define DIR_LEFT  1
+#define DIR_RIGHT 2
+#define DIR_UP    3
+#define DIR_DOWN  4
+
+int dragStartX = 0;
+int dragStartY = 0;
+int dragEndX = 0;
+int dragEndY = 0;
+
+int slideDir = DIR_NONE;
 
 int block = 2;
 int startx = 100;
@@ -33,6 +46,7 @@ void drawboard(HDC hDC);
 void drawblock(HDC hDC);
 void makeRandomBlocks();
 void drawNum2(HDC hDC);
+void DragDirection();
 
 void intboard() {
 	for (int y = 0; y < boardsize; ++y) {
@@ -134,6 +148,87 @@ void drawNum2(HDC hDC) {
 	}
 }
 
+void DragDirection() {
+	int dx = dragEndX - dragStartX;
+	int dy = dragEndY - dragStartY;
+
+	if (abs(dx) > abs(dy)) {
+		if (dx > 0) {
+			slideDir = DIR_RIGHT;
+		}
+		else if (dx < 0) {
+			slideDir = DIR_LEFT;
+		}
+	}
+	else if (abs(dx) < abs(dy)) {
+		if (dy > 0)
+			slideDir = DIR_DOWN;
+		else if (dy < 0)
+			slideDir = DIR_UP;
+	}
+	else {
+		slideDir = DIR_NONE;
+	}
+
+}
+
+bool moveNumbersOneStep(int dir) {
+	bool isMoved = false;
+
+	if (dir == DIR_RIGHT) {
+		for (int y = 0; y < boardsize; ++y) {
+			for (int x = boardsize - 2; x >= 0; --x) {
+
+				if (board[y][x] > 0 && board[y][x + 1] == 0) {
+					board[y][x + 1] = board[y][x];
+					board[y][x] = 0;
+					isMoved = true;
+				}
+			}
+		}
+	}
+
+	if (dir == DIR_LEFT) {
+		for (int y = 0; y < boardsize; ++y) {
+			for (int x = 1; x < boardsize; ++x) {
+	
+				if (board[y][x] > 0 && board[y][x - 1] == 0) {
+					board[y][x - 1] = board[y][x];
+					board[y][x] = 0;
+					isMoved = true;
+				}
+			}
+		}
+	}
+
+	if (dir == DIR_UP) {
+		for (int y = 1; y < boardsize; ++y) {
+			for (int x = 0; x < boardsize; ++x) {
+
+				if (board[y][x] > 0 && board[y - 1][x] == 0) {
+					board[y - 1][x] = board[y][x];
+					board[y][x] = 0;
+					isMoved = true;
+				}
+			}
+		}
+	}
+
+	if (dir == DIR_DOWN) {
+		for (int y = boardsize - 2; y >= 0; --y) {
+			for (int x = 0; x < boardsize; ++x) {
+
+				if (board[y][x] > 0 && board[y + 1][x] == 0) {
+					board[y + 1][x] = board[y][x];
+					board[y][x] = 0;
+					isMoved = true;
+				}
+			}
+		}
+	}
+
+	return isMoved;
+}
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpszCmdParam, int nCmdShow)
 {
 	HWND hWnd;
@@ -203,7 +298,28 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		EndPaint(hWnd, &ps);
 		break;
 	case WM_TIMER:
-		InvalidateRect(hWnd, NULL, false);
+		InvalidateRect(hWnd, NULL, FALSE);
+		break;
+	case WM_LBUTTONDOWN:
+		if (isStart) {
+			dragStartX = LOWORD(lParam);
+			dragStartY = HIWORD(lParam);
+		}
+		break;
+	case WM_LBUTTONUP:
+		if (isStart) {
+			dragEndX = LOWORD(lParam);
+			dragEndY = HIWORD(lParam);
+
+			DragDirection();
+
+			if (slideDir != DIR_NONE) {
+				moveNumbersOneStep(slideDir);   // 드래그 방향으로 딱 한 칸 이동
+				InvalidateRect(hWnd, NULL, TRUE);
+			}
+
+			slideDir = DIR_NONE;
+		}
 		break;
 	case WM_COMMAND:
 		switch (LOWORD(wParam)) {
