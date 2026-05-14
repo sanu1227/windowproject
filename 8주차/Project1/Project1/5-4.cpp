@@ -13,12 +13,13 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam)
 #define boardsize 6
 #define b_num2 2
 
+
 int block = 2;
 int startx = 100;
 int starty = 100;
 bool isStart = false;
 int cells[boardsize * boardsize];
-
+int board[boardsize][boardsize];
 
 CImage num2;
 CImage num4;
@@ -26,6 +27,41 @@ CImage num8;
 CImage num16;
 CImage num32;
 CImage num64;
+
+void intboard();
+void drawboard(HDC hDC);
+void drawblock(HDC hDC);
+void makeRandomBlocks();
+void drawNum2(HDC hDC);
+
+void intboard() {
+	for (int y = 0; y < boardsize; ++y) {
+		for (int x = 0; x < boardsize; ++x) {
+			board[y][x] = 0;
+		}
+	}
+	makeRandomBlocks();
+
+	// 장애물 배치
+	for (int i = 0; i < block; i++) {
+		int cellNumber = cells[i];
+
+		int x = cellNumber % boardsize;
+		int y = cellNumber / boardsize;
+
+		board[y][x] = -1;
+	}
+	// 숫자 2 배치
+	for (int i = block; i < block + b_num2; i++) {
+		int cellNumber = cells[i];
+
+		int x = cellNumber % boardsize;
+		int y = cellNumber / boardsize;
+
+		board[y][x] = 2;
+	}
+
+}
 
 void drawboard(HDC hDC) {
 	for (int i = 0; i <= boardsize; ++i) {
@@ -137,8 +173,13 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 	switch (uMsg) {
 	case WM_CREATE:
 		num2.Load(L"5-4/2.png");
+		num4.Load(L"5-4/4.png");
+		num8.Load(L"5-4/8.png");
+		num16.Load(L"5-4/16.png");
+		num32.Load(L"5-4/32.png");
+		num64.Load(L"5-4/64.png");
 		srand((unsigned int)time(NULL));
-		makeRandomBlocks();
+		intboard();
 		break;
 	case WM_PAINT:
 		GetClientRect(hWnd, &rt);
