@@ -37,15 +37,29 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpszCmdPa
 LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
 	PAINTSTRUCT ps;
-	HDC hDC;
+	HDC hDC, mDC;
+	RECT rt;
+	
 	//--- 메시지 처리하기
 	switch (uMsg) {
 	case WM_CREATE:
 		break;
 	case WM_PAINT:
 		hDC = BeginPaint(hWnd, &ps);
+		mDC = CreateCompatibleDC (hDC); //--- 메모리 DC 만들기
+		hBitmap = CreateCompatibleBitmap (hDC, rt.right, rt.bottom); //--- 메모리 DC와 연결할 비트맵 만들기
+		SelectObject(mDC, (HBITMAP) hBitmap); 
+		
+		BitBlt (hDC, 0, 0, rt.right, rt.bottom, mDC, 0, 0, SRCCOPY);
+		
+		DeleteDC (mDC); //--- 생성한 메모리 DC 삭제
+		DeleteObject (hBitmap);
 		EndPaint(hWnd, &ps);
 		break;
+	case WM_TIMER:
+		InvalidateRect(hWnd, NULL, false); 
+		break;
+		
 	case WM_DESTROY:
 		PostQuitMessage(0);
 		break;
