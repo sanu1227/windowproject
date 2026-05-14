@@ -45,6 +45,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 	//--- 메시지 처리하기
 	switch (uMsg) {
 	case WM_CREATE:
+		GetClientRect (hWnd, &rt);
 		break;
 	case WM_PAINT:
 		hDC = BeginPaint(hWnd, &ps);
