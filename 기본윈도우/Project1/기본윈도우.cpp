@@ -52,6 +52,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		mDC = CreateCompatibleDC (hDC); //--- 메모리 DC 만들기
 		hBitmap = CreateCompatibleBitmap (hDC, rt.right, rt.bottom); //--- 메모리 DC와 연결할 비트맵 만들기
 		SelectObject(mDC, (HBITMAP) hBitmap); 
+		FillRect(mDC, &rt, (HBRUSH)GetStockObject(WHITE_BRUSH));
+
 		
 		BitBlt (hDC, 0, 0, rt.right, rt.bottom, mDC, 0, 0, SRCCOPY);
 		
