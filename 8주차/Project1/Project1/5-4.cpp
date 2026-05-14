@@ -1,39 +1,76 @@
-#include <windows.h> //--- 윈도우 헤더 파일
-#include <tchar.h>
-#include <time.h>
-#include <atlimage.h>
-#include <stdlib.h>
-#include "resource.h"
+﻿#include <windows.h>     // 윈도우 API 사용
+#include <tchar.h>       // 유니코드 문자열 사용
+#include <time.h>        // time 함수 사용
+#include <atlimage.h>    // CImage 사용
+#include <stdlib.h>      // rand, srand, abs 사용
+#include "resource.h"    // 메뉴 리소스 ID 사용
 
-HINSTANCE g_hInst;
+HINSTANCE g_hInst;       // 프로그램 인스턴스 핸들
 LPCTSTR lpszClass = L"My Window Class";
 LPCTSTR lpszWindowName = L"Window Programming Lab";
+
 LRESULT CALLBACK WndProc(HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam);
 
-#define cellsize 100
-#define boardsize 6
-#define b_num2 2
 
+// ------------------------------------------------------------
+// 기본 설정값
+// ------------------------------------------------------------
+#define cellsize 100          // 한 칸의 가로/세로 크기
+#define boardsize 6           // 6 x 6 보드
+#define b_num2 2              // 게임 시작 시 숫자 2의 초기 개수
+
+#define max_num_count 12      // 화면에 존재할 수 있는 숫자 블록의 최대 개수
+#define max_num_value 64      // 현재 이미지가 준비된 최대 숫자
+
+
+// ------------------------------------------------------------
+// 드래그 방향 상수
+// ------------------------------------------------------------
 #define DIR_NONE  0
 #define DIR_LEFT  1
 #define DIR_RIGHT 2
 #define DIR_UP    3
 #define DIR_DOWN  4
 
-int dragStartX = 0;
-int dragStartY = 0;
-int dragEndX = 0;
-int dragEndY = 0;
 
-int slideDir = DIR_NONE;
+// ------------------------------------------------------------
+// 마우스 드래그 위치 저장
+// ------------------------------------------------------------
+int dragStartX = 0;       // 마우스를 처음 누른 x
+int dragStartY = 0;       // 마우스를 처음 누른 y
+int dragEndX = 0;         // 마우스를 뗀 x
+int dragEndY = 0;         // 마우스를 뗀 y
 
-int block = 2;
-int startx = 100;
-int starty = 100;
-bool isStart = false;
-int cells[boardsize * boardsize];
-int board[boardsize][boardsize];
+int slideDir = DIR_NONE;  // 현재 드래그 방향
 
+
+// ------------------------------------------------------------
+// 게임 상태 변수
+// ------------------------------------------------------------
+int block = 2;            // 장애물 개수
+int startx = 100;         // 보드 시작 x 좌표
+int starty = 100;         // 보드 시작 y 좌표
+bool isStart = false;     // 게임 시작 여부
+
+int cells[boardsize * boardsize];       // 보드 칸 번호를 섞기 위한 배열
+int board[boardsize][boardsize];        // 실제 보드 상태 저장 배열
+
+/*
+board 값의 의미
+0  : 빈칸
+-1 : 장애물
+2  : 숫자 2
+4  : 숫자 4
+8  : 숫자 8
+16 : 숫자 16
+32 : 숫자 32
+64 : 숫자 64
+*/
+
+
+// ------------------------------------------------------------
+// 숫자 이미지
+// ------------------------------------------------------------
 CImage num2;
 CImage num4;
 CImage num8;
@@ -41,20 +78,35 @@ CImage num16;
 CImage num32;
 CImage num64;
 
-void intboard();
-void drawboard(HDC hDC);
-void drawblock(HDC hDC);
-void makeRandomBlocks();
-void drawNum2(HDC hDC);
-void DragDirection();
 
-void intboard() {
+// ------------------------------------------------------------
+// 함수 선언
+// ------------------------------------------------------------
+void initBoard();
+void drawBoard(HDC hDC);
+void drawBlock(HDC hDC);
+void makeRandomCells();
+void drawNumbers(HDC hDC);
+void checkDragDirection();
+
+bool mergeNumbers(int dir);
+bool moveNumbersOneStep(int dir);
+bool createNewNum2();
+
+
+// ------------------------------------------------------------
+// 보드 초기화
+// ------------------------------------------------------------
+void initBoard() {
+	// 모든 보드 칸을 빈칸으로 초기화
 	for (int y = 0; y < boardsize; ++y) {
 		for (int x = 0; x < boardsize; ++x) {
 			board[y][x] = 0;
 		}
 	}
-	makeRandomBlocks();
+
+	// 전체 칸 번호를 랜덤하게 섞음
+	makeRandomCells();
 
 	// 장애물 배치
 	for (int i = 0; i < block; i++) {
@@ -65,7 +117,8 @@ void intboard() {
 
 		board[y][x] = -1;
 	}
-	// 숫자 2 배치
+
+	// 숫자 2 초기 배치
 	for (int i = block; i < block + b_num2; i++) {
 		int cellNumber = cells[i];
 
@@ -74,25 +127,34 @@ void intboard() {
 
 		board[y][x] = 2;
 	}
-
 }
 
-void drawboard(HDC hDC) {
+
+// ------------------------------------------------------------
+// 보드 격자 그리기
+// ------------------------------------------------------------
+void drawBoard(HDC hDC) {
+	// 가로선 그리기
 	for (int i = 0; i <= boardsize; ++i) {
 		MoveToEx(hDC, startx, starty + i * cellsize, NULL);
 		LineTo(hDC, startx + boardsize * cellsize, starty + i * cellsize);
 	}
+
+	// 세로선 그리기
 	for (int i = 0; i <= boardsize; ++i) {
 		MoveToEx(hDC, startx + i * cellsize, starty, NULL);
 		LineTo(hDC, startx + i * cellsize, starty + boardsize * cellsize);
 	}
 }
 
-void drawblock(HDC hDC) {
 
-	HBRUSH hBrush = CreateSolidBrush(RGB(255, 0, 0)); // 빨간색 블록
+// ------------------------------------------------------------
+// 장애물 그리기
+// ------------------------------------------------------------
+void drawBlock(HDC hDC) {
+	HBRUSH hBrush = CreateSolidBrush(RGB(255, 0, 0));    // 장애물 색상: 빨강
 	HBRUSH oldBrush = (HBRUSH)SelectObject(hDC, hBrush);
-	
+
 	for (int y = 0; y < boardsize; y++) {
 		for (int x = 0; x < boardsize; x++) {
 
@@ -113,13 +175,17 @@ void drawblock(HDC hDC) {
 	DeleteObject(hBrush);
 }
 
-void makeRandomBlocks() {
-	// 1. 보드판 전체 칸 번호 저장
+
+// ------------------------------------------------------------
+// 전체 칸 번호를 랜덤하게 섞기
+// ------------------------------------------------------------
+void makeRandomCells() {
+	// 0 ~ 35까지 칸 번호 저장
 	for (int i = 0; i < boardsize * boardsize; i++) {
 		cells[i] = i;
 	}
 
-	// 2. 배열 섞기
+	// 피셔-예이츠 셔플 방식으로 섞기
 	for (int i = boardsize * boardsize - 1; i > 0; i--) {
 		int r = rand() % (i + 1);
 
@@ -129,52 +195,186 @@ void makeRandomBlocks() {
 	}
 }
 
-void drawNum2(HDC hDC) {
 
+// ------------------------------------------------------------
+// 숫자 이미지 그리기
+// ------------------------------------------------------------
+void drawNumbers(HDC hDC) {
 	for (int y = 0; y < boardsize; y++) {
 		for (int x = 0; x < boardsize; x++) {
 
-			// board 값이 2이면 숫자 2 이미지 그림
-			if (board[y][x] == 2) {
+			// 숫자 블록이 있는 칸만 처리
+			if (board[y][x] > 0) {
 				int left = startx + x * cellsize;
 				int top = starty + y * cellsize;
 				int right = left + cellsize;
 				int bottom = top + cellsize;
 
-				RECT Rectnum2 = { left, top, right, bottom };
-				num2.Draw(hDC, Rectnum2);
+				RECT rectNumber = { left, top, right, bottom };
+
+				// 해당 숫자에 맞는 이미지 출력
+				if (board[y][x] == 2)
+					num2.Draw(hDC, rectNumber);
+
+				else if (board[y][x] == 4)
+					num4.Draw(hDC, rectNumber);
+
+				else if (board[y][x] == 8)
+					num8.Draw(hDC, rectNumber);
+
+				else if (board[y][x] == 16)
+					num16.Draw(hDC, rectNumber);
+
+				else if (board[y][x] == 32)
+					num32.Draw(hDC, rectNumber);
+
+				else if (board[y][x] == 64)
+					num64.Draw(hDC, rectNumber);
 			}
 		}
 	}
 }
 
-void DragDirection() {
+
+// ------------------------------------------------------------
+// 드래그 방향 판별
+// ------------------------------------------------------------
+void checkDragDirection() {
 	int dx = dragEndX - dragStartX;
 	int dy = dragEndY - dragStartY;
 
+	// 가로 이동량이 더 크면 좌/우 판정
 	if (abs(dx) > abs(dy)) {
-		if (dx > 0) {
+		if (dx > 0)
 			slideDir = DIR_RIGHT;
-		}
-		else if (dx < 0) {
+		else if (dx < 0)
 			slideDir = DIR_LEFT;
-		}
+		else
+			slideDir = DIR_NONE;
 	}
+
+	// 세로 이동량이 더 크면 상/하 판정
 	else if (abs(dx) < abs(dy)) {
 		if (dy > 0)
 			slideDir = DIR_DOWN;
 		else if (dy < 0)
 			slideDir = DIR_UP;
+		else
+			slideDir = DIR_NONE;
 	}
+
+	// 가로와 세로 이동량이 같으면 무시
 	else {
 		slideDir = DIR_NONE;
 	}
-
 }
 
+
+// ------------------------------------------------------------
+// 같은 숫자끼리 먼저 합치기
+// 합쳐진 경우 true 반환
+// ------------------------------------------------------------
+bool mergeNumbers(int dir) {
+	bool isMerged = false;
+
+	// --------------------------------------------------------
+	// 오른쪽 방향 합치기
+	// 오른쪽부터 왼쪽으로 검사해야 같은 드래그 안에서 중복 합치기 방지 가능
+	// --------------------------------------------------------
+	if (dir == DIR_RIGHT) {
+		for (int y = 0; y < boardsize; ++y) {
+			for (int x = boardsize - 2; x >= 0; --x) {
+
+				// 현재 칸과 오른쪽 칸이 같은 숫자이며,
+				// 현재 숫자가 최대값보다 작을 때만 합침
+				if (
+					board[y][x] > 0 &&
+					board[y][x] == board[y][x + 1] &&
+					board[y][x] < max_num_value
+					) {
+					board[y][x + 1] *= 2;
+					board[y][x] = 0;
+					isMerged = true;
+				}
+			}
+		}
+	}
+
+	// --------------------------------------------------------
+	// 왼쪽 방향 합치기
+	// 왼쪽부터 오른쪽으로 검사
+	// --------------------------------------------------------
+	else if (dir == DIR_LEFT) {
+		for (int y = 0; y < boardsize; ++y) {
+			for (int x = 1; x < boardsize; ++x) {
+
+				if (
+					board[y][x] > 0 &&
+					board[y][x] == board[y][x - 1] &&
+					board[y][x] < max_num_value
+					) {
+					board[y][x - 1] *= 2;
+					board[y][x] = 0;
+					isMerged = true;
+				}
+			}
+		}
+	}
+
+	// --------------------------------------------------------
+	// 위쪽 방향 합치기
+	// 위에서 아래로 검사
+	// --------------------------------------------------------
+	else if (dir == DIR_UP) {
+		for (int x = 0; x < boardsize; ++x) {
+			for (int y = 1; y < boardsize; ++y) {
+
+				if (
+					board[y][x] > 0 &&
+					board[y][x] == board[y - 1][x] &&
+					board[y][x] < max_num_value
+					) {
+					board[y - 1][x] *= 2;
+					board[y][x] = 0;
+					isMerged = true;
+				}
+			}
+		}
+	}
+
+	// --------------------------------------------------------
+	// 아래쪽 방향 합치기
+	// 아래에서 위로 검사
+	// --------------------------------------------------------
+	else if (dir == DIR_DOWN) {
+		for (int x = 0; x < boardsize; ++x) {
+			for (int y = boardsize - 2; y >= 0; --y) {
+
+				if (
+					board[y][x] > 0 &&
+					board[y][x] == board[y + 1][x] &&
+					board[y][x] < max_num_value
+					) {
+					board[y + 1][x] *= 2;
+					board[y][x] = 0;
+					isMerged = true;
+				}
+			}
+		}
+	}
+
+	return isMerged;
+}
+
+
+// ------------------------------------------------------------
+// 합칠 것이 없을 때만 한 칸 이동
+// 이동이 발생하면 true 반환
+// ------------------------------------------------------------
 bool moveNumbersOneStep(int dir) {
 	bool isMoved = false;
 
+	// 오른쪽 이동
 	if (dir == DIR_RIGHT) {
 		for (int y = 0; y < boardsize; ++y) {
 			for (int x = boardsize - 2; x >= 0; --x) {
@@ -188,10 +388,11 @@ bool moveNumbersOneStep(int dir) {
 		}
 	}
 
-	if (dir == DIR_LEFT) {
+	// 왼쪽 이동
+	else if (dir == DIR_LEFT) {
 		for (int y = 0; y < boardsize; ++y) {
 			for (int x = 1; x < boardsize; ++x) {
-	
+
 				if (board[y][x] > 0 && board[y][x - 1] == 0) {
 					board[y][x - 1] = board[y][x];
 					board[y][x] = 0;
@@ -201,9 +402,10 @@ bool moveNumbersOneStep(int dir) {
 		}
 	}
 
-	if (dir == DIR_UP) {
-		for (int y = 1; y < boardsize; ++y) {
-			for (int x = 0; x < boardsize; ++x) {
+	// 위쪽 이동
+	else if (dir == DIR_UP) {
+		for (int x = 0; x < boardsize; ++x) {
+			for (int y = 1; y < boardsize; ++y) {
 
 				if (board[y][x] > 0 && board[y - 1][x] == 0) {
 					board[y - 1][x] = board[y][x];
@@ -214,9 +416,10 @@ bool moveNumbersOneStep(int dir) {
 		}
 	}
 
-	if (dir == DIR_DOWN) {
-		for (int y = boardsize - 2; y >= 0; --y) {
-			for (int x = 0; x < boardsize; ++x) {
+	// 아래쪽 이동
+	else if (dir == DIR_DOWN) {
+		for (int x = 0; x < boardsize; ++x) {
+			for (int y = boardsize - 2; y >= 0; --y) {
 
 				if (board[y][x] > 0 && board[y + 1][x] == 0) {
 					board[y + 1][x] = board[y][x];
@@ -229,12 +432,69 @@ bool moveNumbersOneStep(int dir) {
 
 	return isMoved;
 }
+
+
+// ------------------------------------------------------------
+// 빈칸에 숫자 2 하나 생성
+// 생성 성공 시 true 반환
+// ------------------------------------------------------------
+bool createNewNum2() {
+	int emptyCells[boardsize * boardsize];   // 빈칸 번호 저장 배열
+	int emptyCount = 0;                      // 빈칸 개수
+	int numberCount = 0;                     // 현재 숫자 블록 개수
+
+	// 빈칸 수와 숫자 블록 개수 확인
+	for (int y = 0; y < boardsize; y++) {
+		for (int x = 0; x < boardsize; x++) {
+
+			// 빈칸이면 저장
+			if (board[y][x] == 0) {
+				emptyCells[emptyCount] = y * boardsize + x;
+				emptyCount++;
+			}
+
+			// 숫자 블록이면 개수 증가
+			else if (board[y][x] > 0) {
+				numberCount++;
+			}
+		}
+	}
+
+	// 숫자 블록이 최대 개수에 도달했으면 생성하지 않음
+	if (numberCount >= max_num_count) {
+		return false;
+	}
+
+	// 빈칸이 없으면 생성하지 않음
+	if (emptyCount == 0) {
+		return false;
+	}
+
+	// 빈칸 중 하나를 랜덤 선택
+	int randomIndex = rand() % emptyCount;
+	int cellNumber = emptyCells[randomIndex];
+
+	int x = cellNumber % boardsize;
+	int y = cellNumber / boardsize;
+
+	// 선택된 빈칸에 숫자 2 생성
+	board[y][x] = 2;
+
+	return true;
+}
+
+
+// ------------------------------------------------------------
+// WinMain
+// ------------------------------------------------------------
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpszCmdParam, int nCmdShow)
 {
 	HWND hWnd;
 	MSG Message;
 	WNDCLASSEX WndClass;
+
 	g_hInst = hInstance;
+
 	WndClass.cbSize = sizeof(WndClass);
 	WndClass.style = CS_HREDRAW | CS_VREDRAW;
 	WndClass.lpfnWndProc = (WNDPROC)WndProc;
@@ -247,110 +507,194 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpszCmdPa
 	WndClass.lpszMenuName = MAKEINTRESOURCE(IDR_MENU1);
 	WndClass.lpszClassName = lpszClass;
 	WndClass.hIconSm = LoadIcon(NULL, IDI_APPLICATION);
+
 	RegisterClassEx(&WndClass);
-	hWnd = CreateWindow(lpszClass, lpszWindowName, WS_OVERLAPPEDWINDOW, 0, 0, 1600, 900, NULL, (HMENU)NULL, hInstance, NULL);
+
+	hWnd = CreateWindow(
+		lpszClass,
+		lpszWindowName,
+		WS_OVERLAPPEDWINDOW,
+		0,
+		0,
+		1600,
+		900,
+		NULL,
+		(HMENU)NULL,
+		hInstance,
+		NULL
+	);
+
 	ShowWindow(hWnd, nCmdShow);
 	UpdateWindow(hWnd);
+
 	while (GetMessage(&Message, 0, 0, 0)) {
 		TranslateMessage(&Message);
 		DispatchMessage(&Message);
 	}
+
 	return Message.wParam;
 }
 
+
+// ------------------------------------------------------------
+// 윈도우 메시지 처리
+// ------------------------------------------------------------
 LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
 	PAINTSTRUCT ps;
 	HDC hDC, mDC;
 	RECT rt;
 	HBITMAP hBitmap;
+	HBITMAP oldBitmap;
 
-
-	//--- 메시지 처리하기
 	switch (uMsg) {
+
 	case WM_CREATE:
+		// 이미지 한 번만 로드
 		num2.Load(L"5-4/2.png");
 		num4.Load(L"5-4/4.png");
 		num8.Load(L"5-4/8.png");
 		num16.Load(L"5-4/16.png");
 		num32.Load(L"5-4/32.png");
 		num64.Load(L"5-4/64.png");
+
+		// 랜덤 시드 초기화
 		srand((unsigned int)time(NULL));
-		intboard();
+
+		// 초기 보드 생성
+		initBoard();
 		break;
+
+
 	case WM_PAINT:
 		GetClientRect(hWnd, &rt);
+
 		hDC = BeginPaint(hWnd, &ps);
-		mDC = CreateCompatibleDC(hDC); //--- 메모리 DC 만들기
-		hBitmap = CreateCompatibleBitmap(hDC, rt.right, rt.bottom); //--- 메모리 DC와 연결할 비트맵 만들기
-		SelectObject(mDC, (HBITMAP)hBitmap);
+
+		// 더블 버퍼링용 메모리 DC 생성
+		mDC = CreateCompatibleDC(hDC);
+
+		// 메모리 비트맵 생성
+		hBitmap = CreateCompatibleBitmap(hDC, rt.right, rt.bottom);
+
+		// 기존 비트맵 저장 후 새 비트맵 선택
+		oldBitmap = (HBITMAP)SelectObject(mDC, hBitmap);
+
+		// 배경 흰색으로 지우기
 		FillRect(mDC, &rt, (HBRUSH)GetStockObject(WHITE_BRUSH));
 
-		drawboard(mDC);
+		// 보드판은 항상 그리기
+		drawBoard(mDC);
+
+		// 게임이 시작된 경우만 장애물과 숫자 블록 그리기
 		if (isStart) {
-			drawblock(mDC);
-			drawNum2(mDC);
+			drawBlock(mDC);
+			drawNumbers(mDC);
 		}
+
+		// 메모리 DC 내용을 실제 화면으로 복사
 		BitBlt(hDC, 0, 0, rt.right, rt.bottom, mDC, 0, 0, SRCCOPY);
 
-		DeleteDC(mDC); //--- 생성한 메모리 DC 삭제
+		// 리소스 정리
+		SelectObject(mDC, oldBitmap);
 		DeleteObject(hBitmap);
+		DeleteDC(mDC);
+
 		EndPaint(hWnd, &ps);
 		break;
-	case WM_TIMER:
-		InvalidateRect(hWnd, NULL, FALSE);
-		break;
+
+
 	case WM_LBUTTONDOWN:
+		// 게임 시작 상태에서만 드래그 시작 위치 저장
 		if (isStart) {
 			dragStartX = LOWORD(lParam);
 			dragStartY = HIWORD(lParam);
 		}
 		break;
+
+
 	case WM_LBUTTONUP:
+		// 게임 시작 상태에서만 드래그 동작 처리
 		if (isStart) {
 			dragEndX = LOWORD(lParam);
 			dragEndY = HIWORD(lParam);
 
-			DragDirection();
+			// 드래그 방향 계산
+			checkDragDirection();
 
 			if (slideDir != DIR_NONE) {
-				moveNumbersOneStep(slideDir);   // 드래그 방향으로 딱 한 칸 이동
+				bool isChanged = false;
+
+				// 1. 먼저 합치기 시도
+				bool isMerged = mergeNumbers(slideDir);
+
+				// 2. 합치기가 있었다면 이동은 하지 않음
+				if (isMerged) {
+					isChanged = true;
+				}
+				// 3. 합치기가 없을 때만 한 칸 이동
+				else {
+					bool isMoved = moveNumbersOneStep(slideDir);
+
+					if (isMoved) {
+						isChanged = true;
+					}
+				}
+
+				// 4. 합치기 또는 이동이 실제로 발생했다면 새 숫자 2 생성
+				if (isChanged) {
+					createNewNum2();
+				}
+
+				// 화면 다시 그리기
 				InvalidateRect(hWnd, NULL, TRUE);
 			}
 
+			// 방향 초기화
 			slideDir = DIR_NONE;
 		}
 		break;
+
+
 	case WM_COMMAND:
 		switch (LOWORD(wParam)) {
+
 		case ID_GAME_START:
 			isStart = true;
+			initBoard();
 			InvalidateRect(hWnd, NULL, TRUE);
 			break;
+
 		case ID_GAME_END:
 			isStart = false;
 			InvalidateRect(hWnd, NULL, TRUE);
 			break;
+
 		case ID_BLOCK_2:
 			block = 2;
-			intboard();
+			initBoard();
 			InvalidateRect(hWnd, NULL, TRUE);
 			break;
+
 		case ID_BLOCK_3:
 			block = 3;
-			intboard();
+			initBoard();
 			InvalidateRect(hWnd, NULL, TRUE);
 			break;
+
 		case ID_BLOCK_4:
 			block = 4;
-			intboard();
+			initBoard();
 			InvalidateRect(hWnd, NULL, TRUE);
 			break;
 		}
 		break;
+
+
 	case WM_DESTROY:
 		PostQuitMessage(0);
 		break;
 	}
-	return DefWindowProc(hWnd, uMsg, wParam, lParam); //--- 위의 세 메시지 외의 나머지 메시지는 OS로
+
+	return DefWindowProc(hWnd, uMsg, wParam, lParam);
 }
