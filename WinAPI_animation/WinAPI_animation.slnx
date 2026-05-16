@@ -3,5 +3,5 @@
     <Platform Name="x64" />
     <Platform Name="x86" />
   </Configurations>
-  <Project Path="WinAPI_animation/WinAPI_animation.vcxproj" />
+  <Project Path="WinAPI_animation/WinAPI_animation.vcxproj" Id="ccac7906-4979-4a72-aca7-5022a300c4b3" />
 </Solution>
