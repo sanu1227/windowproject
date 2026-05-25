@@ -4,7 +4,7 @@
 #include <ctime>
 #include <cmath>
 #include <algorithm>
-#include "resource.h"
+#include "6-1.h"
 
 #pragma comment(lib, "user32.lib")
 #pragma comment(lib, "gdi32.lib")
