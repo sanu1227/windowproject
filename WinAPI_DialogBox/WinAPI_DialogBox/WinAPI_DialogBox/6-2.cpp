@@ -127,14 +127,16 @@ std::vector<POINT> MakePathPoints(RECT rt)
         if (circleCount < 1)
             circleCount = 1;
 
+        // 1단계: 위쪽 반원들을 왼쪽에서 오른쪽으로 먼저 이동
         for (int k = 0; k < circleCount; k++)
         {
             int cx = startX + r + k * 2 * r;
 
-            // 위 반원: 왼쪽 -> 오른쪽
             for (int i = 0; i <= 80; i++)
             {
                 double t = (double)i / 80.0;
+
+                // 왼쪽 -> 오른쪽, 위쪽 반원
                 double angle = PI - PI * t;
 
                 POINT p;
@@ -143,11 +145,18 @@ std::vector<POINT> MakePathPoints(RECT rt)
 
                 pts.push_back(p);
             }
+        }
 
-            // 아래 반원: 오른쪽 -> 왼쪽
+        // 2단계: 아래쪽 반원들을 오른쪽에서 왼쪽으로 이동
+        for (int k = circleCount - 1; k >= 0; k--)
+        {
+            int cx = startX + r + k * 2 * r;
+
             for (int i = 0; i <= 80; i++)
             {
                 double t = (double)i / 80.0;
+
+                // 오른쪽 -> 왼쪽, 아래쪽 반원
                 double angle = PI * t;
 
                 POINT p;
